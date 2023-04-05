@@ -10,13 +10,6 @@ jobs:
   run_tests:
     runs-on: ubuntu-latest
     steps:
-      - name: install kubectl
-        run: curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
-
-      - run: chmod +x ./kubectl
-      - run: sudo mv ./kubectl /usr/local/bin/kubectl
-      - run: kubectl version --client
-      
       - name: git clone repo
         uses: actions/checkout@v1
 
@@ -55,13 +48,12 @@ jobs:
           aws-secret-access-key: ${{ secrets.MY_AWS_SECRET_KEY }}
           aws-region           : ${{ env.AWS_REGION_NAME }} 
       
-      #- name: install kubectl
-      #  run: curl -o / -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
+      - name: install kubectl
+        run: curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
 
-      #- run: chmod +x /kubectl
-      #- run: sudo mv ./kubectl /usr/local/bin/kubectl
-      #- run: kubectl version --client
-
+      - run: chmod +x ./kubectl
+      - run: sudo mv ./kubectl /usr/local/bin/kubectl
+      - run: kubectl version --client
 
       - name: apply all config files for kubernetes
         run: kubectl apply -f k8s
