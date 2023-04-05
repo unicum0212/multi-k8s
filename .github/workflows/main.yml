@@ -1,13 +1,56 @@
 name: deploy-multi-k8s
-
+env:
+  AWS_REGION_NAME: "eu-central-1"
 on:
   push:
     branches: 
       - main
 
 jobs:
-  tests:
+  run_tests:
     runs-on: ubuntu-latest
     steps:
+      - name: git clone repo
+        uses: actions/checkout@v1
+
       - name: docker login
         run:  echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+      - run: docker build -t flawwwless/react-tests -f ./client/Dockerfile.dev ./client
+      - run: docker run -e CI=true flawwwless/react-tests npm test
+  
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [tests]
+    steps:
+      - name: git clone repo
+        uses: actions/checkout@v1
+
+      - name: docker login
+        run:  echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+      - run: docker build -t flawwwless/multi-client:latest -t flawwwless/multi-client:${{ github.sha }} -f ./client/Dockerfile ./client
+      - run: docker build -t flawwwless/multi-server:latest -t flawwwless/multi-server:${{ github.sha }} -f ./server/Dockerfile ./server
+      - run: docker build -t flawwwless/multi-worker:latest -t flawwwless/multi-worker:${{ github.sha }} -f ./worker/Dockerfile ./worker
+
+      - run: docker push flawwwless/multi-client:latest
+      - run: docker push flawwwless/multi-server:latest
+      - run: docker push flawwwless/multi-worker:latest
+
+      - run: docker push flawwwless/multi-client:${{ github.sha }}
+      - run: docker push flawwwless/multi-server:${{ github.sha }}
+      - run: docker push flawwwless/multi-worker:${{ github.sha }}
+
+      - name: configure my aws credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id    : ${{ secrets.MY_AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.MY_AWS_SECRET_KEY }}
+          aws-region           : ${{ env.AWS_REGION_NAME }} 
+      
+      - name: apply all config files for kubernetes
+        run: kubectl apply -f k8s
+
+      - run: kubectl set image deployment/server-deployment server=flawwwless/multi-server:${{ github.sha }}
+      - run: kubectl set image deployment/client-deployment client=flawwwless/multi-client:${{ github.sha }}
+      - run: kubectl set image deployment/worker-deployment worker=flawwwless/multi-worker:${{ github.sha }}
